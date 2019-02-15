@@ -41,13 +41,10 @@ public class WanMonitor {
 
         for ( ;; sleep() ) {
 
-            // reduce the max number of failures if we're successful
+            // reset if we're successful
             if ( isTraceRouteSuccessful() ) {
-                maxNumberFailures--;
-                if( maxNumberFailures < MAX_FAILURES ) {
-                    maxNumberFailures = MAX_FAILURES;
-                }
-                numberFailures = 0; // reset
+                maxNumberFailures = MAX_FAILURES;
+                numberFailures = 0;
             }
             else {
                 numberFailures++;
@@ -90,7 +87,7 @@ public class WanMonitor {
             return true;
         }
         catch ( IOException e ) {
-            LOGGER.info( "Error executing command.", e );
+            LOGGER.info( "WAN failed." );
             return false;
         }
     }
