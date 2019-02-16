@@ -1,19 +1,20 @@
 
 package com.macbackpackers;
 
+import java.io.IOException;
 import java.util.Properties;
-import java.util.concurrent.TimeUnit;
 
-import org.apache.commons.lang3.SystemUtils;
-import org.openqa.selenium.By;
-import org.openqa.selenium.WebDriver;
-import org.openqa.selenium.WebElement;
-import org.openqa.selenium.chrome.ChromeDriver;
-import org.openqa.selenium.chrome.ChromeOptions;
-import org.openqa.selenium.support.ui.ExpectedConditions;
-import org.openqa.selenium.support.ui.WebDriverWait;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import com.gargoylesoftware.htmlunit.BrowserVersion;
+import com.gargoylesoftware.htmlunit.NicelyResynchronizingAjaxController;
+import com.gargoylesoftware.htmlunit.WebClient;
+import com.gargoylesoftware.htmlunit.html.DomElement;
+import com.gargoylesoftware.htmlunit.html.HtmlAnchor;
+import com.gargoylesoftware.htmlunit.html.HtmlInput;
+import com.gargoylesoftware.htmlunit.html.HtmlListItem;
+import com.gargoylesoftware.htmlunit.html.HtmlPage;
 
 public class RebootRouterHuaweiB525 {
 
@@ -30,64 +31,61 @@ public class RebootRouterHuaweiB525 {
         properties = props;
     }
 
-    public void rebootRouter() throws Exception {
+    public void rebootRouter() throws IOException {
         String routerUrl = properties.getProperty( "router.url" );
         LOGGER.info( "Rebooting " + routerUrl );
-        int maxWaitSeconds = Integer.parseInt( properties.getProperty( "chromescraper.maxwait.seconds" ) );
-        WebDriver driver = createWebDriver( 
-                properties.getProperty( "chromescraper.driver.options" ), 
-                maxWaitSeconds );
-
-        // load the login page
-        driver.get( routerUrl );
-        WebElement settingsAnchor = driver.findElement( By.id( "settings" ) );
-        settingsAnchor.click();
-
-        // pop-up dialog should appear
-        WebElement usernameBox = driver.findElement( By.id( "username" ) );
-        WebElement passwordBox = driver.findElement( By.id( "password" ) );
-        WebElement submitButton = driver.findElement( By.id( "pop_login" ) );
-
-        WebDriverWait wait = new WebDriverWait( driver, maxWaitSeconds );
-        wait.until( ExpectedConditions.visibilityOfAllElements( usernameBox, passwordBox, submitButton ) );
-
-        usernameBox.clear();
-        usernameBox.sendKeys( properties.getProperty( "router.username" ) );
-        passwordBox.clear();
-        passwordBox.sendKeys( properties.getProperty( "router.password" ) );
-        submitButton.click();
-
-        // wait until we've moved onto the next page
-        wait.until( ExpectedConditions.stalenessOf( submitButton ) );
-
-        WebElement systemMenu = driver.findElement( By.id( "system" ) );
-        systemMenu.click();
-        WebElement rebootMenu = driver.findElement( By.id( "reboot" ) );
-        rebootMenu.click();
-        
-        WebElement rebootButton = driver.findElement( By.id( "reboot_apply_button" ) );
-        rebootButton.click();
-        WebElement confirmButton = driver.findElement( By.id( "pop_confirm" ) );
-        confirmButton.click();
-
-        LOGGER.info( "Reboot completed." );
-        driver.close();
+        WebClient webClient = getWebClient();
+        HtmlPage routerPage = webClient.getPage( routerUrl );
+        LOGGER.info( routerPage.asXml() );
+        routerPage = routerPage.getElementById( "logout_span" ).click(); // actually is Log in
+        LOGGER.info( "LOGIN: " + routerPage.asXml() );
+        HtmlInput usernameInput = routerPage.getHtmlElementById("username");
+        HtmlInput passwordInput = routerPage.getHtmlElementById("password");
+        usernameInput.setValueAttribute( properties.getProperty( "router.username" ) );
+        passwordInput.setValueAttribute( properties.getProperty( "router.password" ) );
+        HtmlInput loginBtn = routerPage.getHtmlElementById("pop_login");
+        routerPage = loginBtn.click();
+        webClient.waitForBackgroundJavaScript( 10000 );
+        LOGGER.info( "LOGGED IN: " + routerPage.asXml() );
+        HtmlAnchor settingsLink = routerPage.getHtmlElementById( "settings" );
+        routerPage = settingsLink.click();
+        LOGGER.info( "SETTINGS: " + routerPage.asXml() );
+        webClient.waitForBackgroundJavaScript( 10000 );
+        HtmlListItem systemMenu = routerPage.getHtmlElementById( "system" );
+        routerPage = systemMenu.click();
+        webClient.waitForBackgroundJavaScript( 1000 );
+        HtmlListItem rebootMenu = routerPage.getHtmlElementById( "reboot" );
+//        routerPage = webClient.getPage( "http://192.168.19.1/html/reboot.html" );
+        routerPage = rebootMenu.click();
+        webClient.waitForBackgroundJavaScript( 1000 );
+        HtmlAnchor restartBtn = HtmlAnchor.class.cast( rebootMenu.getFirstElementChild() );
+        routerPage = restartBtn.click();
+        webClient.waitForBackgroundJavaScript( 1000 );
+        LOGGER.info( "REBOOT PAGE: " + routerPage.asXml() );
+        HtmlInput applyBtn = routerPage.getHtmlElementById( "reboot_apply_button" );
+        routerPage = applyBtn.click();
+        webClient.waitForBackgroundJavaScript( 1000 );
+        HtmlInput confirmBtn = routerPage.getHtmlElementById( "pop_confirm" );
+        routerPage = confirmBtn.click();
+        webClient.waitForBackgroundJavaScript( 4000 );
+        LOGGER.info( "POST APPLY PAGE: " + routerPage.asXml() );
     }
 
-    public WebDriver createWebDriver(String chromeOptions, int maxWaitSeconds) throws Exception {
-        System.setProperty( "webdriver.chrome.driver", getClass().getClassLoader().getResource(
-                SystemUtils.IS_OS_WINDOWS ? "chromedriver.exe" : "chromedriver" ).getPath() );
+    private WebClient getWebClient() {
+        WebClient webClient = new WebClient( BrowserVersion.CHROME ); // return a new instance of this when requested
+        webClient.getOptions().setThrowExceptionOnFailingStatusCode( false );
+        webClient.getOptions().setThrowExceptionOnScriptError( false );
+        webClient.getOptions().setJavaScriptEnabled( true );
+        webClient.getOptions().setCssEnabled( false );
+        webClient.getOptions().setRedirectEnabled( true );
+        webClient.getOptions().setUseInsecureSSL( true );
+        webClient.setAjaxController( new NicelyResynchronizingAjaxController() );
+        webClient.getOptions().setTimeout( 60000 );
+        webClient.setJavaScriptTimeout( 60000 );
 
-        ChromeOptions options = new ChromeOptions();
-        options.addArguments( chromeOptions.split( " " ) );
-
-        WebDriver driver = new ChromeDriver( options );
-
-        // configure wait-time when finding elements on the page
-        driver.manage().timeouts().implicitlyWait( maxWaitSeconds, TimeUnit.SECONDS );
-        driver.manage().timeouts().pageLoadTimeout( maxWaitSeconds * 2, TimeUnit.SECONDS );
-
-        return driver;
+//        DefaultCredentialsProvider credentialsProvider = (DefaultCredentialsProvider) webClient.getCredentialsProvider();
+//        credentialsProvider.addCredentials( properties.getProperty( "router.username" ), properties.getProperty( "router.password" ) );
+        return webClient;
     }
     
 }
