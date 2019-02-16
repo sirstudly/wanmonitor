@@ -1,0 +1,11 @@
+version: "3.2"
+services:
+  wanmonitor:
+    build:
+      context: './'
+    ports:
+      - 7897:7897 # remote debugging port
+    volumes:
+      - ./target/wanmonitor.jar:/root/wanmonitor.jar
+      - ./target/lib/:/root/lib/
+    container_name: wanmonitor

@@ -17,17 +17,19 @@ import com.gargoylesoftware.htmlunit.html.HtmlSpan;
 public class RebootRouter {
 
     private static final Logger LOGGER = LoggerFactory.getLogger( RebootRouter.class );
-    private Properties properties = new Properties();
+    private Properties properties;
 
     public static void main( String argv[] ) throws Exception {
-        new RebootRouter().rebootRouter();
+        Properties props = new Properties();
+        props.load( RebootRouter.class.getClassLoader().getResourceAsStream( "config.properties" ) );
+        new RebootRouter( props ).rebootRouter();
     }
     
-    public RebootRouter() throws Exception {
-        properties.load( getClass().getClassLoader().getResourceAsStream( "config.properties" ) );
+    public RebootRouter( Properties props ) throws Exception {
+        properties = props;
     }
 
-    private void rebootRouter() throws IOException {
+    public void rebootRouter() throws IOException {
         String routerUrl = properties.getProperty( "router.url" );
         LOGGER.info( "Rebooting " + routerUrl );
         HtmlPage routerPage = getWebClient().getPage( routerUrl );

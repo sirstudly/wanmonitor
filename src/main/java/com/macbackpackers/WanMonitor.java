@@ -13,13 +13,6 @@ import org.apache.commons.exec.PumpStreamHandler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.gargoylesoftware.htmlunit.BrowserVersion;
-import com.gargoylesoftware.htmlunit.DefaultCredentialsProvider;
-import com.gargoylesoftware.htmlunit.NicelyResynchronizingAjaxController;
-import com.gargoylesoftware.htmlunit.WebClient;
-import com.gargoylesoftware.htmlunit.html.HtmlPage;
-import com.gargoylesoftware.htmlunit.html.HtmlSpan;
-
 public class WanMonitor {
 
     private static final Logger LOGGER = LoggerFactory.getLogger( WanMonitor.class );
@@ -33,7 +26,7 @@ public class WanMonitor {
         properties.load( getClass().getClassLoader().getResourceAsStream( "config.properties" ) );
     }
 
-    public void run() throws IOException {
+    public void run() throws Exception {
 
         final int MAX_FAILURES = Integer.parseInt( properties.getProperty( "max.failures.before.reboot" ) );
         int numberFailures = 0;
@@ -43,10 +36,12 @@ public class WanMonitor {
 
             // reset if we're successful
             if ( isTraceRouteSuccessful() ) {
+                LOGGER.debug( "Situation nominal" );
                 maxNumberFailures = MAX_FAILURES;
                 numberFailures = 0;
             }
             else {
+                LOGGER.debug( "Uh oh..." );
                 numberFailures++;
             }
 
@@ -69,12 +64,15 @@ public class WanMonitor {
     }
 
     private boolean isTraceRouteSuccessful() {
-        final Pattern p = Pattern.compile( properties.getProperty( "monitor.ip.regex" ) );
+        final Pattern p = Pattern.compile( properties.getProperty( "monitor.ip.regex" ), Pattern.DOTALL );
         try {
             String out = runCommand( properties.getProperty( "monitor.command" ) );
             Matcher m = p.matcher( out );
             if ( m.find() ) {
-                if ( false == m.group( 1 ).matches( properties.getProperty( "monitor.ip.regex.match" ) ) ) {
+                if ( m.group( 1 ).matches( properties.getProperty( "monitor.ip.regex.match" ) ) ) {
+                    LOGGER.debug( "MATCHED: " + m.group( 1 ) );
+                }
+                else {
                     LOGGER.info( "tracert no longer goes through modem." );
                     LOGGER.info( out );
                     return false;
@@ -87,7 +85,7 @@ public class WanMonitor {
             return true;
         }
         catch ( IOException e ) {
-            LOGGER.info( "WAN failed." );
+            LOGGER.info( "WAN failed.", e );
             return false;
         }
     }
@@ -102,26 +100,13 @@ public class WanMonitor {
         return outputStream.toString();
     }
 
-    private void rebootRouter() throws IOException {
-        HtmlPage routerPage = getWebClient().getPage( properties.getProperty( "router.url" ) );
-        HtmlSpan rebootSpan = routerPage.getFirstByXPath( "//span[text()='Reboot']" );
-        routerPage = rebootSpan.click();
+    private void rebootRouter() throws Exception {
+        if( properties.containsKey( "chromescraper.maxwait.seconds" )) {
+            new RebootRouterHuaweiB525( properties ).rebootRouter();
+        }
+        else {
+            new RebootRouter( properties ).rebootRouter();
+        }
     }
 
-    private WebClient getWebClient() {
-        WebClient webClient = new WebClient( BrowserVersion.CHROME ); // return a new instance of this when requested
-        webClient.getOptions().setThrowExceptionOnFailingStatusCode( false );
-        webClient.getOptions().setThrowExceptionOnScriptError( false );
-        webClient.getOptions().setJavaScriptEnabled( true );
-        webClient.getOptions().setCssEnabled( false );
-        webClient.getOptions().setRedirectEnabled( true );
-        webClient.getOptions().setUseInsecureSSL( true );
-        webClient.setAjaxController( new NicelyResynchronizingAjaxController() );
-        webClient.getOptions().setTimeout( 60000 );
-        webClient.setJavaScriptTimeout( 60000 );
-
-        DefaultCredentialsProvider credentialsProvider = (DefaultCredentialsProvider) webClient.getCredentialsProvider();
-        credentialsProvider.addCredentials( properties.getProperty( "router.username" ), properties.getProperty( "router.password" ) );
-        return webClient;
-    }
 }
