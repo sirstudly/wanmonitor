@@ -10,7 +10,6 @@ import org.slf4j.LoggerFactory;
 import com.gargoylesoftware.htmlunit.BrowserVersion;
 import com.gargoylesoftware.htmlunit.NicelyResynchronizingAjaxController;
 import com.gargoylesoftware.htmlunit.WebClient;
-import com.gargoylesoftware.htmlunit.html.DomElement;
 import com.gargoylesoftware.htmlunit.html.HtmlAnchor;
 import com.gargoylesoftware.htmlunit.html.HtmlInput;
 import com.gargoylesoftware.htmlunit.html.HtmlListItem;
@@ -26,7 +25,7 @@ public class RebootRouterHuaweiB525 {
         props.load( RebootRouterHuaweiB525.class.getClassLoader().getResourceAsStream( "config.properties" ) );
         new RebootRouterHuaweiB525( props ).rebootRouter();
     }
-    
+
     public RebootRouterHuaweiB525( Properties props ) throws Exception {
         properties = props;
     }
@@ -36,39 +35,54 @@ public class RebootRouterHuaweiB525 {
         LOGGER.info( "Rebooting " + routerUrl );
         WebClient webClient = getWebClient();
         HtmlPage routerPage = webClient.getPage( routerUrl );
-        LOGGER.info( routerPage.asXml() );
         routerPage = routerPage.getElementById( "logout_span" ).click(); // actually is Log in
-        LOGGER.info( "LOGIN: " + routerPage.asXml() );
-        HtmlInput usernameInput = routerPage.getHtmlElementById("username");
-        HtmlInput passwordInput = routerPage.getHtmlElementById("password");
+        HtmlInput usernameInput = routerPage.getHtmlElementById( "username" );
+        HtmlInput passwordInput = routerPage.getHtmlElementById( "password" );
         usernameInput.setValueAttribute( properties.getProperty( "router.username" ) );
         passwordInput.setValueAttribute( properties.getProperty( "router.password" ) );
-        HtmlInput loginBtn = routerPage.getHtmlElementById("pop_login");
+        HtmlInput loginBtn = routerPage.getHtmlElementById( "pop_login" );
+
+        LOGGER.info( "Logging in..." );
         routerPage = loginBtn.click();
-        webClient.waitForBackgroundJavaScript( 10000 );
-        LOGGER.info( "LOGGED IN: " + routerPage.asXml() );
+        webClient.waitForBackgroundJavaScript( 8000 );
+
+        LOGGER.info( "Navigating to settings page..." );
         HtmlAnchor settingsLink = routerPage.getHtmlElementById( "settings" );
         routerPage = settingsLink.click();
-        LOGGER.info( "SETTINGS: " + routerPage.asXml() );
-        webClient.waitForBackgroundJavaScript( 10000 );
+        webClient.waitForBackgroundJavaScript( 1000 );
+
+        LOGGER.info( "Clicking on Systems side-menu option..." );
         HtmlListItem systemMenu = routerPage.getHtmlElementById( "system" );
         routerPage = systemMenu.click();
         webClient.waitForBackgroundJavaScript( 1000 );
+
+        LOGGER.info( "Clicking on Reboot side-menu option..." );
         HtmlListItem rebootMenu = routerPage.getHtmlElementById( "reboot" );
-//        routerPage = webClient.getPage( "http://192.168.19.1/html/reboot.html" );
         routerPage = rebootMenu.click();
         webClient.waitForBackgroundJavaScript( 1000 );
+
+        LOGGER.info( "Clicking on Restart button..." );
         HtmlAnchor restartBtn = HtmlAnchor.class.cast( rebootMenu.getFirstElementChild() );
         routerPage = restartBtn.click();
         webClient.waitForBackgroundJavaScript( 1000 );
-        LOGGER.info( "REBOOT PAGE: " + routerPage.asXml() );
+
+        LOGGER.info( "Clicking on Apply button..." );
         HtmlInput applyBtn = routerPage.getHtmlElementById( "reboot_apply_button" );
         routerPage = applyBtn.click();
-        webClient.waitForBackgroundJavaScript( 1000 );
+        webClient.waitForBackgroundJavaScript( 2000 );
+
+        LOGGER.info( "Clicking on Confirm..." );
         HtmlInput confirmBtn = routerPage.getHtmlElementById( "pop_confirm" );
         routerPage = confirmBtn.click();
-        webClient.waitForBackgroundJavaScript( 4000 );
-        LOGGER.info( "POST APPLY PAGE: " + routerPage.asXml() );
+        webClient.waitForBackgroundJavaScript( 10000 );
+
+        if ( routerPage.asXml().contains( "The device is rebooting" ) ) {
+            LOGGER.info( "The device is rebooting..." );
+        }
+        else {
+            LOGGER.debug( routerPage.asXml() );
+            LOGGER.info( "Weirdness... I think something unexpected happened." );
+        }
     }
 
     private WebClient getWebClient() {
@@ -82,10 +96,7 @@ public class RebootRouterHuaweiB525 {
         webClient.setAjaxController( new NicelyResynchronizingAjaxController() );
         webClient.getOptions().setTimeout( 60000 );
         webClient.setJavaScriptTimeout( 60000 );
-
-//        DefaultCredentialsProvider credentialsProvider = (DefaultCredentialsProvider) webClient.getCredentialsProvider();
-//        credentialsProvider.addCredentials( properties.getProperty( "router.username" ), properties.getProperty( "router.password" ) );
         return webClient;
     }
-    
+
 }
