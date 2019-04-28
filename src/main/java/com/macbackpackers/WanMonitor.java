@@ -81,6 +81,7 @@ public class WanMonitor {
             else {
                 LOGGER.info( "No regex match??" );
                 LOGGER.info( out );
+                return false;
             }
             return true;
         }
@@ -100,12 +101,17 @@ public class WanMonitor {
         return outputStream.toString();
     }
 
-    private void rebootRouter() throws Exception {
-        if( properties.containsKey( "chromescraper.maxwait.seconds" )) {
-            new RebootRouterHuaweiB525( properties ).rebootRouter();
+    private void rebootRouter() {
+        try {
+            if( properties.containsKey( "chromescraper.maxwait.seconds" )) {
+                new RebootRouterHuaweiB525( properties ).rebootRouter();
+            }
+            else {
+                new RebootRouter( properties ).rebootRouter();
+            }
         }
-        else {
-            new RebootRouter( properties ).rebootRouter();
+        catch( Exception ex ) {
+            LOGGER.error( "Failed to reboot router.", ex );
         }
     }
 

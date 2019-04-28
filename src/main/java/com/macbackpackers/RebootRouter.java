@@ -32,9 +32,11 @@ public class RebootRouter {
     public void rebootRouter() throws IOException {
         String routerUrl = properties.getProperty( "router.url" );
         LOGGER.info( "Rebooting " + routerUrl );
-        HtmlPage routerPage = getWebClient().getPage( routerUrl );
-        HtmlSpan rebootSpan = routerPage.getFirstByXPath( "//span[text()='Reboot']" );
-        routerPage = rebootSpan.click();
+        try( WebClient webClient = getWebClient() ) {
+            HtmlPage routerPage = webClient.getPage( routerUrl );
+            HtmlSpan rebootSpan = routerPage.getFirstByXPath( "//span[text()='Reboot']" );
+            routerPage = rebootSpan.click();
+        }
     }
 
     private WebClient getWebClient() {
