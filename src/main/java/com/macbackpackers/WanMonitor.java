@@ -101,14 +101,10 @@ public class WanMonitor {
         return outputStream.toString();
     }
 
-    private void rebootRouter() {
+    private void rebootRouter() throws Exception {
         try {
-            if( properties.containsKey( "chromescraper.maxwait.seconds" )) {
-                new RebootRouterHuaweiB525( properties ).rebootRouter();
-            }
-            else {
-                new RebootRouter( properties ).rebootRouter();
-            }
+            RebootRouter r = (RebootRouter) Class.forName( properties.getProperty( "router.classname" ) ).newInstance();
+            r.rebootRouter( properties );
         }
         catch( Exception ex ) {
             LOGGER.error( "Failed to reboot router.", ex );

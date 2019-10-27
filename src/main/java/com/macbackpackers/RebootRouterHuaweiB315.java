@@ -16,22 +16,18 @@ import com.gargoylesoftware.htmlunit.html.HtmlLabel;
 import com.gargoylesoftware.htmlunit.html.HtmlListItem;
 import com.gargoylesoftware.htmlunit.html.HtmlPage;
 
-public class RebootRouterHuaweiB315 {
+public class RebootRouterHuaweiB315  implements RebootRouter {
 
     private static final Logger LOGGER = LoggerFactory.getLogger( RebootRouterHuaweiB315.class );
-    private Properties properties = new Properties();
 
     public static void main( String argv[] ) throws Exception {
         Properties props = new Properties();
         props.load( RebootRouterHuaweiB315.class.getClassLoader().getResourceAsStream( "config.properties" ) );
-        new RebootRouterHuaweiB315( props ).rebootRouter();
+        new RebootRouterHuaweiB315().rebootRouter( props );
     }
 
-    public RebootRouterHuaweiB315( Properties props ) throws Exception {
-        properties = props;
-    }
-
-    public void rebootRouter() throws IOException {
+    @Override
+    public void rebootRouter( Properties properties ) throws IOException {
         String routerUrl = properties.getProperty( "router.url" );
         LOGGER.info( "Rebooting " + routerUrl );
         try( WebClient webClient = getWebClient() ) {
