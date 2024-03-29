@@ -1,11 +1,12 @@
 version: "3.2"
 services:
   wanmonitor:
+    image: wanmonitor
     build:
       context: './'
     ports:
-      - 7897:7897 # remote debugging port
+      - 5005:5005 # remote debugging port
     volumes:
-      - ./target/wanmonitor.jar:/root/wanmonitor.jar
-      - ./target/lib/:/root/lib/
+      - ./src:/root/src/
+      - ./build:/root/target/
     container_name: wanmonitor

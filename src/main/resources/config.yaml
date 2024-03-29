@@ -1,0 +1,27 @@
+---
+chrome-options: user-data-dir=chromeprofile --headless --disable-gpu --start-maximized --ignore-certificate-errors --remote-debugging-port=9222
+chrome-max-wait-seconds: 60
+chrome-test: true
+modems:
+  - name: wan5
+    beanname: RebootRouterHuaweiH122_373
+    monitor:
+      command: curl -m 3 -s --interface en0 https://wtfismyip.com/text
+      period-seconds: 20
+      ip-regex: (\d+\.\d+\.\d+\.\d+)
+      ip-regex-match: .*
+      max-failures-before-reboot: 10
+    router:
+      url: http://192.168.5.1
+      password: mypassword
+  - name: wan10
+    beanname: RebootRouter5GEE
+    monitor:
+      command: curl -m 3 -s --interface en0 https://ip4.top10vpn.com/
+      period-seconds: 20
+      ip-regex: (\d+\.\d+\.\d+\.\d+)
+      ip-regex-match: .*
+      max-failures-before-reboot: 10
+    router:
+      url: http://192.168.26.1
+      password: mypassword

@@ -1,0 +1,1 @@
+java -cp .;wanmonitor.jar;lib/* -jar wanmonitor.jar

@@ -8,14 +8,14 @@
 
     <!-- A standard RollingFileAppender  -->
     <appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
-      <file>wanmonitor.log</file>
+      <file>${log.filename}</file>
 
       <encoder class="ch.qos.logback.classic.encoder.PatternLayoutEncoder">
           <Pattern>%d{yyyy-MM-dd HH:mm:ss} %mdc [%thread] %level %logger{35}:%line - %msg%n</Pattern>
       </encoder>
 
       <rollingPolicy class="ch.qos.logback.core.rolling.FixedWindowRollingPolicy">
-          <FileNamePattern>wanmonitor.%i.log.zip</FileNamePattern>
+          <FileNamePattern>${log.filename}.%i.zip</FileNamePattern>
           <MinIndex>1</MinIndex>
           <MaxIndex>10</MaxIndex>
       </rollingPolicy>
@@ -26,8 +26,42 @@
 
     </appender>
 
-	<root level="debug">
+    <appender name="FILE-THREAD" class="ch.qos.logback.classic.sift.SiftingAppender">
+
+        <!-- This is MDC value -->
+        <!-- We will assign a value to 'monitorName' via Java code -->
+        <discriminator>
+            <key>monitorName</key>
+            <defaultValue>wanmonitor</defaultValue>
+        </discriminator>
+
+        <sift>
+            <!-- A standard RollingFileAppender, the log file is based on 'monitorName' at runtime  -->
+            <appender name="FILE-${monitorName}" class="ch.qos.logback.core.rolling.RollingFileAppender">
+                <file>${monitorName}.log</file>
+
+                <encoder class="ch.qos.logback.classic.encoder.PatternLayoutEncoder">
+                    <Pattern>
+                        %d{yyyy-MM-dd HH:mm:ss} %mdc [%thread] %level %logger{35} - %msg%n
+                    </Pattern>
+                </encoder>
+
+                <rollingPolicy class="ch.qos.logback.core.rolling.FixedWindowRollingPolicy">
+                    <FileNamePattern>${monitorName}.%i.log.zip
+                    </FileNamePattern>
+                    <MinIndex>1</MinIndex>
+                    <MaxIndex>10</MaxIndex>
+                </rollingPolicy>
+                <triggeringPolicy class="ch.qos.logback.core.rolling.SizeBasedTriggeringPolicy">
+                    <MaxFileSize>10MB</MaxFileSize>
+                </triggeringPolicy>
+            </appender>
+        </sift>
+    </appender>
+
+    <root level="debug">
 		<appender-ref ref="STDOUT" />
-		<appender-ref ref="FILE" />
+		<!-- appender-ref ref="FILE" / -->
+        <appender-ref ref="FILE-THREAD" />
 	</root>
 </configuration>

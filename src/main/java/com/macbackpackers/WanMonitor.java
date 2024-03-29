@@ -1,114 +1,67 @@
 
 package com.macbackpackers;
 
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
-import java.util.Properties;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
-
-import org.apache.commons.exec.CommandLine;
-import org.apache.commons.exec.DefaultExecutor;
-import org.apache.commons.exec.PumpStreamHandler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.CommandLineRunner;
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.context.ApplicationContext;
+import org.springframework.context.annotation.Bean;
 
-public class WanMonitor {
+import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+
+@SpringBootApplication
+public class WanMonitor implements CommandLineRunner {
 
     private static final Logger LOGGER = LoggerFactory.getLogger( WanMonitor.class );
-    private Properties properties = new Properties();
 
-    public static void main( String argv[] ) throws Exception {
-        new WanMonitor().run();
+    @Autowired
+    private ApplicationContext context;
+
+    public static void main( String args[] ) throws Exception {
+        System.getProperties().load( WanMonitor.class.getClassLoader().getResourceAsStream( "application.properties" ) );
+        SpringApplication.run( WanMonitor.class, args );
     }
-    
-    public WanMonitor() throws Exception {
-        properties.load( getClass().getClassLoader().getResourceAsStream( "config.properties" ) );
-    }
 
-    public void run() throws Exception {
+    @Override
+    public void run( String... args ) {
 
-        final int MAX_FAILURES = Integer.parseInt( properties.getProperty( "max.failures.before.reboot" ) );
-        int numberFailures = 0;
-        int maxNumberFailures = MAX_FAILURES;
-
-        for ( ;; sleep() ) {
-
-            // reset if we're successful
-            if ( isTraceRouteSuccessful() ) {
-                LOGGER.debug( "Situation nominal" );
-                maxNumberFailures = MAX_FAILURES;
-                numberFailures = 0;
-            }
-            else {
-                LOGGER.debug( "Uh oh..." );
-                numberFailures++;
-            }
-
-            if ( numberFailures > maxNumberFailures ) {
-                LOGGER.info( "Over " + maxNumberFailures + " failures... Rebooting router." );
-                rebootRouter();
-                numberFailures = 0; // reset
-                maxNumberFailures *= 2;
-            }
+        WanMonitorConfiguration config = context.getBean( WanMonitorConfiguration.class );
+        if ( config.isChromeTest() ) {
+            doChromeTest();
         }
+
+        List<Thread> threads = (List<Thread>) context.getBean( "workers" );
+        LOGGER.info( "Found " + threads.size() + " workers" );
+
+        LOGGER.info( "Kicking off threads..." );
+        ExecutorService executorService = Executors.newCachedThreadPool();
+        threads.forEach( executorService::execute );
+
+        // the worker threads don't ever terminate so we'll just block forever here...
+        LOGGER.info( "Waiting for threads to finish..." );
+        executorService.shutdown();
     }
 
-    private void sleep() {
+    private void doChromeTest() {
+        ChromeWebDriver chrome = context.getBean( ChromeWebDriver.class );
         try {
-            Thread.sleep( Integer.parseInt( properties.getProperty( "monitor.period.seconds" ) ) * 1000 );
+            LOGGER.info( "Checking able to launch Chrome!" );
+            chrome.getWebDriver().get( "https://www3.pioneer.com/argentina/SIC/test.html" );
+            LOGGER.info( "DONE! " + chrome.getWebDriver().getPageSource() );
         }
-        catch ( InterruptedException ex ) {
-            // awake
-        }
-    }
-
-    private boolean isTraceRouteSuccessful() {
-        final Pattern p = Pattern.compile( properties.getProperty( "monitor.ip.regex" ), Pattern.DOTALL );
-        try {
-            String out = runCommand( properties.getProperty( "monitor.command" ) );
-            Matcher m = p.matcher( out );
-            if ( m.find() ) {
-                if ( m.group( 1 ).matches( properties.getProperty( "monitor.ip.regex.match" ) ) ) {
-                    LOGGER.debug( "MATCHED: " + m.group( 1 ) );
-                }
-                else {
-                    LOGGER.info( "tracert no longer goes through modem." );
-                    LOGGER.info( out );
-                    return false;
-                }
-            }
-            else {
-                LOGGER.info( "No regex match??" );
-                LOGGER.info( out );
-                return false;
-            }
-            return true;
-        }
-        catch ( IOException e ) {
-            LOGGER.info( "WAN failed.", e );
-            return false;
+        finally {
+            chrome.getWebDriver().close();
         }
     }
 
-    private String runCommand( String commandLine ) throws IOException {
-        ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
-        CommandLine commandline = CommandLine.parse( commandLine );
-        DefaultExecutor exec = new DefaultExecutor();
-        PumpStreamHandler streamHandler = new PumpStreamHandler( outputStream );
-        exec.setStreamHandler( streamHandler );
-        exec.execute( commandline );
-        return outputStream.toString();
+    @Bean( name = "workers" )
+    public List<Thread> getWorkerThreads( WanMonitorConfiguration yamlProperties ) {
+        return yamlProperties.getModems().stream().map( m ->
+                new Thread( new WanMonitorRunner( m, (RebootRouter) context.getBean( m.getBeanname() ) ) ) ).toList();
     }
-
-    private void rebootRouter() throws Exception {
-        try {
-            RebootRouter r = (RebootRouter) Class.forName( properties.getProperty( "router.classname" ) ).newInstance();
-            r.rebootRouter( properties );
-        }
-        catch( Exception ex ) {
-            LOGGER.error( "Failed to reboot router.", ex );
-        }
-    }
-
 }

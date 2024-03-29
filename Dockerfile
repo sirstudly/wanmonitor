@@ -1,9 +1,12 @@
-FROM openjdk:8-jre-alpine
+FROM openjdk:17-alpine
 
-RUN apk update && apk upgrade
-RUN apk add bash curl
+COPY entrypoint.sh /usr/local/bin/entrypoint.sh
+COPY pom.xml /root
 
-COPY src/main/resources/config.properties src/main/resources/logback.xml src/main/resources/wanmonitor.sh /root/
+#RUN apt-get update && apt-get install dos2unix && dos2unix /usr/local/bin/entrypoint.sh && chmod +x /usr/local/bin/entrypoint.sh
+RUN apk update && apk add --upgrade maven bash dos2unix
+RUN dos2unix /usr/local/bin/entrypoint.sh && chmod +x /usr/local/bin/entrypoint.sh
 
-# keep the container running
-CMD tail -f /dev/null
+#Start application
+WORKDIR /root
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
